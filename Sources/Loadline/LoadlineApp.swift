@@ -4,6 +4,10 @@ import SwiftUI
 struct LoadlineApp: App {
     @State private var monitor = AppMonitor()
 
+    init() {
+        _ = Updater.shared
+    }
+
     var body: some Scene {
         MenuBarExtra {
             MenuBarView()
@@ -27,37 +31,36 @@ struct MenuBarLabel: View {
     @AppStorage(SettingsKey.menuBarDisplay) private var display: MenuBarDisplay = .pressureAndCPU
 
     var body: some View {
-        HStack(spacing: 3) {
-            switch display {
-            case .pressureAndCPU:
-                // A status item shows at most one image and one text, drops symbols embedded in
-                // text, and ignores symbol tints — so tinted modes draw the label into one image.
-                Image(nsImage: MenuBarImage.label([cpuSegment, pressureSegment(showsText: true)]))
-            case .pressure:
-                Image(nsImage: MenuBarImage.label([pressureSegment(showsText: true)]))
-            case .iconOnly:
-                Image(nsImage: MenuBarImage.label([pressureSegment(showsText: false)]))
-            case .memory:
-                Image(systemName: "memorychip")
-                Text(monitor.system.used.compactGBString)
-            case .cpu:
-                Image(systemName: "cpu")
-                Text(monitor.systemCPU.cpuString)
-            }
+        // A status item shows at most one image and one text, drops symbols embedded in text,
+        // and ignores symbol tints — so every mode draws the label into one image. That also
+        // lets the numbers keep a fixed width instead of nudging neighboring items as they change.
+        switch display {
+        case .pressureAndCPU:
+            Image(nsImage: MenuBarImage.label([cpuSegment, pressureSegment(showsText: true)]))
+        case .pressure:
+            Image(nsImage: MenuBarImage.label([pressureSegment(showsText: true)]))
+        case .iconOnly:
+            Image(nsImage: MenuBarImage.label([pressureSegment(showsText: false)]))
+        case .memory:
+            Image(nsImage: MenuBarImage.label([MenuBarImage.Segment(
+                symbol: "memorychip", text: monitor.system.used.compactGBString, reserve: "00.0G", tint: nil
+            )]))
+        case .cpu:
+            Image(nsImage: MenuBarImage.label([cpuSegment]))
         }
-        .monospacedDigit()
     }
 
     private func pressureSegment(showsText: Bool) -> MenuBarImage.Segment {
         MenuBarImage.Segment(
             symbol: "memorychip",
             text: showsText ? "\(monitor.system.pressurePercent)%" : nil,
+            reserve: "00%",
             tint: monitor.system.pressure.nsColor
         )
     }
 
     private var cpuSegment: MenuBarImage.Segment {
-        MenuBarImage.Segment(symbol: "cpu", text: String(format: "%.0f%%", monitor.systemCPU), tint: nil)
+        MenuBarImage.Segment(symbol: "cpu", text: String(format: "%.0f%%", monitor.systemCPU), reserve: "00%", tint: nil)
     }
 }
 
@@ -67,6 +70,9 @@ enum MenuBarImage {
     struct Segment {
         let symbol: String
         let text: String?
+        /// Text whose width is kept even when `text` is narrower, so the label doesn't resize
+        /// as values change digit counts. Wider text still grows the label.
+        var reserve: String? = nil
         /// nil draws the symbol in the menu bar's text color.
         let tint: NSColor?
     }
@@ -79,7 +85,11 @@ enum MenuBarImage {
             (
                 symbol: NSImage(systemSymbolName: segment.symbol, accessibilityDescription: nil)?
                     .withSymbolConfiguration(symbolConfig)?.size ?? NSSize(width: 15, height: 15),
-                text: segment.text.map { ($0 as NSString).size(withAttributes: measure) } ?? .zero
+                text: segment.text.map { text in
+                    let size = (text as NSString).size(withAttributes: measure)
+                    let reserved = segment.reserve.map { ($0 as NSString).size(withAttributes: measure).width } ?? 0
+                    return NSSize(width: max(size.width, reserved), height: size.height)
+                } ?? .zero
             )
         }
 

@@ -41,6 +41,7 @@ Open the DMG and drag Loadline to Applications. The app is signed with a Develop
 - Include menu bar (accessory) apps
 - Refresh interval: 1, 3, 5, or 10 seconds
 - Launch at login
+- Check for updates (Loadline also checks automatically once a day, via [Sparkle](https://sparkle-project.org))
 
 ## Requirements
 
@@ -64,6 +65,8 @@ To build a signed, notarized DMG (requires a Developer ID certificate and a `not
 ./release.sh --publish   # also create a GitHub release for v<version>
 ```
 
+Bump `CFBundleShortVersionString` and `CFBundleVersion` in `Resources/Info.plist` before releasing. The script also writes a signed `appcast.xml` and attaches it to the release; the app's update feed is the latest release's `appcast.xml`, so publishing a release is all it takes to ship an update. Signing the appcast needs the Sparkle EdDSA private key in your login keychain (`.build/artifacts/sparkle/Sparkle/bin/generate_keys`).
+
 ## How the numbers are measured
 
 | Metric | Source | Matches Activity Monitor's |
@@ -85,5 +88,6 @@ Sources/Loadline/
 ├── ProcessSampler.swift  # libproc / Mach sampling of processes, CPU, and memory
 ├── MenuBarView.swift     # Popover UI
 ├── MainWindowView.swift  # Details window
-└── SharedViews.swift     # System summary, graphs, bars
+├── SharedViews.swift     # System summary, graphs, bars
+└── Updater.swift         # Sparkle auto-updates
 ```

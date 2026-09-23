@@ -141,6 +141,7 @@ private struct SettingsMenu: View {
                 set: { monitor.launchAtLogin = $0 }
             ))
             Divider()
+            Button("Check for Updates…") { Updater.shared.checkForUpdates() }
             Button("Quit Loadline") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         } label: {
