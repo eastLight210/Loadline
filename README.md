@@ -8,6 +8,12 @@ Loadline groups each app's helper processes (Safari's WebContent processes, Elec
   <img src="docs/images/window.png" width="720" alt="Loadline details window listing apps by memory">
 </p>
 
+## Download
+
+**[Download the latest release](https://github.com/eastLight210/Loadline/releases/latest)** (macOS 15 or later, Apple Silicon and Intel)
+
+Open the DMG and drag Loadline to Applications. The app is signed with a Developer ID and notarized by Apple.
+
 ## Features
 
 **Menu bar**
@@ -50,6 +56,13 @@ Loadline groups each app's helper processes (Safari's WebContent processes, Elec
 ```
 
 The script builds with SwiftPM, assembles `build/Loadline.app`, and signs it ad hoc. Copy the app to `/Applications` to keep it around; "Launch at Login" works best from there.
+
+To build a signed, notarized DMG (requires a Developer ID certificate and a `notarytool` keychain profile, see the top of the script):
+
+```sh
+./release.sh             # → build/Loadline-<version>.dmg
+./release.sh --publish   # also create a GitHub release for v<version>
+```
 
 ## How the numbers are measured
 
