@@ -17,6 +17,9 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Loadline"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --app-icon AppIcon \
+    --platform macosx --minimum-deployment-target 15.0 --target-device mac \
+    --output-partial-info-plist "$(mktemp)" >/dev/null
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
     codesign --force --sign - "$APP" >/dev/null
 else
