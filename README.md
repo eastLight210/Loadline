@@ -2,6 +2,8 @@
 
 A macOS menu bar app that shows which apps are using your CPU and memory, and lets you quit them in one click.
 
+**[loadline.badgerworks.dev](https://loadline.badgerworks.dev)**
+
 Loadline groups each app's helper processes (Safari's WebContent processes, Electron renderers, XPC services, and so on) under the app itself, so the numbers reflect what an app really costs — the same way Activity Monitor attributes them.
 
 <p align="center">
