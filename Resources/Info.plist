@@ -7,7 +7,7 @@
 	<key>CFBundleExecutable</key>
 	<string>Loadline</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.loadline.Loadline</string>
+	<string>net.donghyeok.Loadline</string>
 	<key>CFBundleName</key>
 	<string>Loadline</string>
 	<key>CFBundleDisplayName</key>
