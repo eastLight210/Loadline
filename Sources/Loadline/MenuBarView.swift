@@ -9,9 +9,7 @@ struct MenuBarView: View {
     @State private var listHeight: CGFloat = 0
     private let maxListHeight: CGFloat = 400
 
-    @AppStorage(SettingsKey.menuBarDisplay) private var menuBarDisplay: MenuBarDisplay = .pressureAndCPU
     @AppStorage(SettingsKey.includeAccessoryApps) private var includeAccessory = false
-    @AppStorage(SettingsKey.refreshInterval) private var refreshInterval = 3.0
 
     private var sort: AppSort { monitor.popoverSort }
 
@@ -113,31 +111,44 @@ struct MenuBarView: View {
             .buttonStyle(.borderless)
             .help("Show Details")
 
-            Menu {
-                Picker("Menu Bar Shows", selection: $menuBarDisplay) {
-                    ForEach(MenuBarDisplay.allCases) { Text($0.title).tag($0) }
-                }
-                Toggle("Include Menu Bar Apps", isOn: $includeAccessory)
-                Picker("Refresh Every", selection: $refreshInterval) {
-                    Text("1 second").tag(1.0)
-                    Text("3 seconds").tag(3.0)
-                    Text("5 seconds").tag(5.0)
-                    Text("10 seconds").tag(10.0)
-                }
-                Toggle("Launch at Login", isOn: Binding(
-                    get: { monitor.launchAtLogin },
-                    set: { monitor.launchAtLogin = $0 }
-                ))
-                Divider()
-                Button("Quit Loadline") { NSApp.terminate(nil) }
-                    .keyboardShortcut("q")
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
+            SettingsMenu()
         }
+    }
+}
+
+/// Kept as its own view so it reads no sampled data: if the menu's contents were rebuilt on
+/// every refresh, an open menu would reset (submenus collapse) while the user is choosing.
+private struct SettingsMenu: View {
+    @Environment(AppMonitor.self) private var monitor
+    @AppStorage(SettingsKey.menuBarDisplay) private var menuBarDisplay: MenuBarDisplay = .pressureAndCPU
+    @AppStorage(SettingsKey.includeAccessoryApps) private var includeAccessory = false
+    @AppStorage(SettingsKey.refreshInterval) private var refreshInterval = 3.0
+
+    var body: some View {
+        Menu {
+            Picker("Menu Bar Shows", selection: $menuBarDisplay) {
+                ForEach(MenuBarDisplay.allCases) { Text($0.title).tag($0) }
+            }
+            Toggle("Include Menu Bar Apps", isOn: $includeAccessory)
+            Picker("Refresh Every", selection: $refreshInterval) {
+                Text("1 second").tag(1.0)
+                Text("3 seconds").tag(3.0)
+                Text("5 seconds").tag(5.0)
+                Text("10 seconds").tag(10.0)
+            }
+            Toggle("Launch at Login", isOn: Binding(
+                get: { monitor.launchAtLogin },
+                set: { monitor.launchAtLogin = $0 }
+            ))
+            Divider()
+            Button("Quit Loadline") { NSApp.terminate(nil) }
+                .keyboardShortcut("q")
+        } label: {
+            Image(systemName: "gearshape")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
     }
 }
 
