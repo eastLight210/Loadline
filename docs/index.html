@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Loadline — See what your Mac apps really cost</title>
+<meta name="description" content="Loadline is a macOS menu bar app that shows which apps are using your CPU and memory, helper processes included, and lets you quit them in one click.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://loadline.badgerworks.dev/">
+<meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://loadline.badgerworks.dev/">
+<meta property="og:title" content="Loadline">
+<meta property="og:description" content="See which Mac apps are really using your CPU and memory, and quit them in one click.">
+<meta property="og:image" content="https://loadline.badgerworks.dev/images/window.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{
+  --bg:#fbfbfd; --bg2:#f2f2f5; --text:#1d1d1f; --muted:#6e6e73; --line:#d2d2d7;
+  --accent:#0a6396; --accent2:#1ac9a0; --btn:#0071e3; --btn-text:#fff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#000; --bg2:#111113; --text:#f5f5f7; --muted:#a1a1a6; --line:#2c2c2e;
+    --btn:#2997ff;
+  }
+}
+:root[data-theme="dark"]{ --bg:#000; --bg2:#111113; --text:#f5f5f7; --muted:#a1a1a6; --line:#2c2c2e; --btn:#2997ff; }
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--text);font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+nav{position:sticky;top:0;z-index:5;backdrop-filter:saturate(180%) blur(20px);background:color-mix(in srgb,var(--bg) 72%,transparent);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:52px;font-size:14px}
+nav .brand{display:flex;gap:8px;align-items:center;font-weight:600;text-decoration:none}
+nav .links{display:flex;gap:20px;color:var(--muted)}
+nav .links a{text-decoration:none}
+.icon{width:28px;height:28px;border-radius:22%;flex:none}
+.hero{text-align:center;padding:88px 0 40px}
+.hero .icon{width:112px;height:112px;margin:0 auto 28px;display:block;box-shadow:0 12px 32px rgba(10,99,150,.25)}
+h1{font-size:clamp(40px,7vw,72px);line-height:1.04;letter-spacing:-.025em;font-weight:700}
+.lede{font-size:clamp(19px,2.4vw,23px);color:var(--muted);max-width:640px;margin:20px auto 0;line-height:1.4}
+.cta{margin-top:32px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--btn);color:var(--btn-text);text-decoration:none;padding:13px 26px;border-radius:980px;font-weight:500}
+.meta{font-size:13px;color:var(--muted)}
+.stage{margin:56px auto 0;padding:56px 16px 0;border-radius:28px;background:linear-gradient(160deg,#1ac9a0 0%,#0a6396 100%);max-width:1040px;overflow:hidden;display:flex;justify-content:center}
+.stage img{width:min(349px,80%);display:block;border-radius:14px 14px 0 0;box-shadow:0 -10px 60px rgba(0,0,0,.25)}
+section{padding:96px 0}
+h2{font-size:clamp(30px,4.5vw,48px);letter-spacing:-.02em;line-height:1.1;text-align:center}
+.sub{color:var(--muted);text-align:center;max-width:600px;margin:16px auto 0;font-size:19px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:48px}
+.card{background:var(--bg2);border-radius:20px;padding:28px}
+.card h3{font-size:19px;margin-bottom:6px}
+.card p{color:var(--muted);font-size:15px}
+kbd{font:inherit;font-size:.85em;border:1px solid var(--line);border-radius:5px;padding:0 5px}
+.shot{margin-top:48px}
+.shot img{width:100%;display:block;border-radius:20px}
+.menubar{display:flex;justify-content:center;margin-top:40px}
+.menubar img{width:225px;border-radius:10px;background:#8b8fa6;padding:6px 12px}
+footer{border-top:1px solid var(--line);padding:28px 0 40px;font-size:13px;color:var(--muted)}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="ll" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="bgA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1ac9a0"/><stop offset="1" stop-color="#0a6396"/></linearGradient>
+  <linearGradient id="fadeA" x1="0" y1="318" x2="0" y2="800" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#bgA)"/>
+  <polygon points="196,640 338,556 450,618 582,392 690,482 828,318 828,800 196,800" fill="url(#fadeA)"/>
+  <polyline points="196,640 338,556 450,618 582,392 690,482 828,318" fill="none" stroke="#fff" stroke-width="64" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol></defs></svg>
+
+<nav><div class="wrap">
+  <a class="brand" href="#"><svg class="icon"><use href="#ll"/></svg>Loadline</a>
+  <div class="links"><a href="#features">Features</a><a href="https://github.com/eastLight210/Loadline">GitHub</a></div>
+</div></nav>
+
+<header class="hero wrap">
+  <svg class="icon"><use href="#ll"/></svg>
+  <h1>See what your apps<br>really cost.</h1>
+  <p class="lede">Loadline sits in your menu bar and shows which apps are using your CPU and memory, helper processes included. Quit the heavy ones in one click.</p>
+  <div class="cta">
+    <a class="btn" href="https://github.com/eastLight210/Loadline/releases/latest">Download for Mac</a>
+    <span class="meta">Free · macOS 15 or later · Apple Silicon and Intel · Notarized by Apple</span>
+  </div>
+</header>
+
+<div class="wrap"><div class="stage"><img src="images/popover.png" alt="Loadline popover with CPU and memory graphs and a list of apps"></div></div>
+
+<section id="features" class="wrap">
+  <h2>The whole app, not just one process.</h2>
+  <p class="sub">Safari's web content, Electron renderers, XPC services. Loadline counts them under the app that owns them, the way Activity Monitor does.</p>
+  <div class="grid">
+    <div class="card"><h3>Every helper, counted</h3><p>Each app's helper processes are grouped under the app, so the numbers reflect what it really costs.</p></div>
+    <div class="card"><h3>Quit in one click</h3><p>Hover a row to quit an app. Hold <kbd>⌥</kbd> to force quit.</p></div>
+    <div class="card"><h3>Your menu bar, your way</h3><p>Show CPU and pressure, memory used, CPU only, or just the icon.</p></div>
+    <div class="card"><h3>History at a glance</h3><p>CPU and memory-pressure graphs, plus an App, Wired, Compressed and Swap breakdown.</p></div>
+    <div class="card"><h3>Drill into processes</h3><p>Search, expand an app to see every process with its PID, and end individual helpers.</p></div>
+    <div class="card"><h3>Stays up to date</h3><p>Checks for updates once a day. Launches at login if you want it to.</p></div>
+  </div>
+  <div class="menubar"><img src="images/menu-bar.png" alt="Menu bar showing CPU 6% and memory pressure 24%"></div>
+  <div class="shot"><img src="images/window.png" alt="Loadline details window listing apps by memory"></div>
+</section>
+
+<footer><div class="wrap"><span>© 2026 Badgerworks</span><a href="https://github.com/eastLight210/Loadline">Source on GitHub</a></div></footer>
+</body>
+</html>
