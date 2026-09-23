@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct QuitAppsApp: App {
+struct LoadlineApp: App {
     @State private var monitor = AppMonitor()
 
     var body: some Scene {
@@ -13,7 +13,7 @@ struct QuitAppsApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("QuitApps", id: "main") {
+        Window("Loadline", id: "main") {
             MainWindowView()
                 .environment(monitor)
         }

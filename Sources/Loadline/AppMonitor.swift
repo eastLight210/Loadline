@@ -244,7 +244,7 @@ final class AppMonitor {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                NSLog("QuitApps: launch at login change failed: \(error)")
+                NSLog("Loadline: launch at login change failed: \(error)")
             }
         }
     }

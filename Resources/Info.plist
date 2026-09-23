@@ -5,13 +5,13 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleExecutable</key>
-	<string>QuitApps</string>
+	<string>Loadline</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.quitapps.QuitApps</string>
+	<string>dev.loadline.Loadline</string>
 	<key>CFBundleName</key>
-	<string>QuitApps</string>
+	<string>Loadline</string>
 	<key>CFBundleDisplayName</key>
-	<string>QuitApps</string>
+	<string>Loadline</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

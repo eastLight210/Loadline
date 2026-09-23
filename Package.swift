@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "QuitApps",
+    name: "Loadline",
     platforms: [.macOS(.v15)],
     targets: [
         .executableTarget(
-            name: "QuitApps",
-            path: "Sources/QuitApps",
+            name: "Loadline",
+            path: "Sources/Loadline",
             swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]

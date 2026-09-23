@@ -129,7 +129,7 @@ struct MenuBarView: View {
                     set: { monitor.launchAtLogin = $0 }
                 ))
                 Divider()
-                Button("Quit QuitApps") { NSApp.terminate(nil) }
+                Button("Quit Loadline") { NSApp.terminate(nil) }
                     .keyboardShortcut("q")
             } label: {
                 Image(systemName: "gearshape")
