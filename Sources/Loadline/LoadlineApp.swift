@@ -1,11 +1,16 @@
+import AppIntents
 import SwiftUI
 
 @main
 struct LoadlineApp: App {
-    @State private var monitor = AppMonitor()
+    @State private var monitor: AppMonitor
 
     init() {
         _ = Updater.shared
+        let monitor = AppMonitor()
+        _monitor = State(initialValue: monitor)
+        // Lets App Intents (Siri, Shortcuts, Spotlight) read the same live samples as the UI.
+        AppDependencyManager.shared.add(dependency: monitor)
     }
 
     var body: some Scene {

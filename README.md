@@ -45,10 +45,14 @@ Open the DMG and drag Loadline to Applications. The app is signed with a Develop
 - Launch at login
 - Check for updates (Loadline also checks automatically once a day, via [Sparkle](https://sparkle-project.org))
 
+**Shortcuts**
+- Actions for the Shortcuts app: Get Top Apps (by CPU or memory), Get System Load, and Quit App
+- App Shortcut phrases in English and Korean, such as "How's my Mac doing in Loadline"
+
 ## Requirements
 
 - macOS 15 (Sequoia) or later
-- Swift 6 toolchain (Xcode 16 or later) to build
+- Xcode 27 or later to build (`build.sh` relies on its SwiftPM build layout and App Intents tools)
 
 ## Build
 
@@ -58,7 +62,7 @@ Open the DMG and drag Loadline to Applications. The app is signed with a Develop
 ./build.sh release --run   # build, then relaunch the app
 ```
 
-The script builds with SwiftPM, assembles `build/Loadline.app`, and signs it ad hoc. Copy the app to `/Applications` to keep it around; "Launch at Login" works best from there.
+The script builds with SwiftPM, assembles `build/Loadline.app`, extracts the App Intents metadata that Shortcuts reads (a step SwiftPM skips but Xcode normally runs), and signs the app ad hoc. Copy the app to `/Applications` to keep it around; "Launch at Login" works best from there.
 
 To build a signed, notarized DMG (requires a Developer ID certificate and a `notarytool` keychain profile, see the top of the script):
 

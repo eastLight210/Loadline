@@ -1,0 +1,6 @@
+/* App Intents strings that collide with unlocalized SwiftUI literals in the UI (see LocalizedStringResource.intents). */
+
+"Memory" = "메모리";
+"Force Quit" = "강제 종료";
+"Quit" = "종료";
+"Cancel" = "취소";

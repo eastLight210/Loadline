@@ -1,0 +1,7 @@
+/* Siri / Spotlight phrases for LoadlineShortcuts. Keys are the English phrases in LoadlineIntents.swift. */
+
+"What's using the most ${metric} in ${applicationName}" = "${applicationName}에서 ${metric} 제일 많이 쓰는 앱 알려줘";
+"Show top apps in ${applicationName}" = "${applicationName}에서 상위 앱 보여줘";
+"How's my Mac doing in ${applicationName}" = "${applicationName}으로 맥 상태 확인해줘";
+"Check system load with ${applicationName}" = "${applicationName}에서 시스템 부하 확인해줘";
+"Quit ${app} with ${applicationName}" = "${applicationName}으로 ${app} 종료해줘";

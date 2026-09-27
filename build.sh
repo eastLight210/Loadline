@@ -18,9 +18,28 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Framewor
 cp "$BIN_DIR/Loadline" "$APP/Contents/MacOS/Loadline"
 ditto "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+cp -R Resources/*.lproj "$APP/Contents/Resources/"
 xcrun actool Resources/AppIcon.icon --compile "$APP/Contents/Resources" --app-icon AppIcon \
     --platform macosx --minimum-deployment-target 15.0 --target-device mac \
     --output-partial-info-plist "$(mktemp)" >/dev/null
+
+# SwiftPM emits .swiftconstvalues but doesn't run the App Intents metadata step Xcode does;
+# without Metadata.appintents, Siri and Shortcuts never see the app's intents.
+CONFIG_DIR="$(tr '[:lower:]' '[:upper:]' <<< "${CONFIG:0:1}")${CONFIG:1}"
+CONST_VALS="$(mktemp)"
+find ".build/out/Intermediates.noindex/Loadline.build/$CONFIG_DIR/Loadline-p.build/Objects-normal/$(uname -m)" \
+    -name '*.swiftconstvalues' | sed "s|^|$PWD/|" > "$CONST_VALS"
+SOURCES="$(mktemp)"
+find "$PWD/Sources/Loadline" -name '*.swift' > "$SOURCES"
+xcrun appintentsmetadataprocessor --quiet-warnings \
+    --output "$APP/Contents/Resources" \
+    --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun --find swift)")")")" \
+    --module-name Loadline --sdk-root "$(xcrun --show-sdk-path --sdk macosx)" \
+    --xcode-version "$(xcodebuild -version | awk '/Build version/ { print $3 }')" \
+    --platform-family macOS --deployment-target 15.0 --target-triple "$(uname -m)-apple-macos15.0" \
+    --source-file-list "$SOURCES" --swift-const-vals-list "$CONST_VALS" 2>&1 | grep -v 'appintentsmetadataprocessor\[' || true
+[[ -d "$APP/Contents/Resources/Metadata.appintents" ]] || { echo "App Intents metadata missing" >&2; exit 1; }
+
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
     SIGN=(codesign --force --sign -)
 else
