@@ -7,6 +7,8 @@ struct MenuBarView: View {
     @State private var modifiers = ModifierWatcher()
     /// Measured height of the app list; the popover sizes to content, so the ScrollView needs an explicit height.
     @State private var listHeight: CGFloat = 0
+    /// App whose processes are shown inline; only one at a time.
+    @State private var expandedApp: pid_t?
     private let maxListHeight: CGFloat = 400
 
     @AppStorage(SettingsKey.includeAccessoryApps) private var includeAccessory = false
@@ -39,25 +41,40 @@ struct MenuBarView: View {
                     .frame(maxWidth: .infinity, minHeight: 80)
             } else {
                 let apps = monitor.apps.sorted(by: sort)
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(apps) { app in
-                            MenuAppRow(
-                                app: app,
-                                sort: sort,
-                                share: app.share(of: apps, by: sort),
-                                forceMode: modifiers.optionDown,
-                                isQuitting: monitor.quitting.contains(app.pid)
-                            ) {
-                                monitor.quit(app, force: modifiers.optionDown)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(apps) { app in
+                                MenuAppRow(
+                                    app: app,
+                                    sort: sort,
+                                    share: app.share(of: apps, by: sort),
+                                    forceMode: modifiers.optionDown,
+                                    isQuitting: monitor.quitting.contains(app.pid),
+                                    isExpanded: expandedApp == app.pid,
+                                    onToggle: { toggle(app, proxy: proxy) }
+                                ) {
+                                    monitor.quit(app, force: modifiers.optionDown)
+                                }
+                                if expandedApp == app.pid {
+                                    ForEach(app.processes.sorted(by: sort)) { process in
+                                        MenuProcessRow(
+                                            process: process,
+                                            forceMode: modifiers.optionDown,
+                                            isEnding: monitor.endingProcesses.contains(process.pid)
+                                        )
+                                        // Main process shares the app's pid, so give rows their own id space.
+                                        .id(ProcessRowID(pid: process.pid))
+                                    }
+                                }
                             }
                         }
+                        .padding(.bottom, 4)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                     }
-                    .padding(.bottom, 4)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+                    .frame(height: min(max(listHeight, 1), maxListHeight))
+                    .scrollBounceBehavior(.basedOnSize)
                 }
-                .frame(height: min(max(listHeight, 1), maxListHeight))
-                .scrollBounceBehavior(.basedOnSize)
             }
 
             Divider()
@@ -71,8 +88,27 @@ struct MenuBarView: View {
             modifiers.start()
             Task { await monitor.refresh() }
         }
-        .onDisappear { modifiers.stop() }
+        .onDisappear {
+            modifiers.stop()
+            expandedApp = nil
+        }
         .onChange(of: includeAccessory) { Task { await monitor.refresh() } }
+    }
+
+    private func toggle(_ app: AppUsage, proxy: ScrollViewProxy) {
+        let expanding = expandedApp != app.pid
+        withAnimation(.easeInOut(duration: 0.15)) {
+            expandedApp = expanding ? app.pid : nil
+        }
+        guard expanding, let last = app.processes.sorted(by: sort).last else { return }
+        // Once the rows exist, bring them into view: last process first, then the app row,
+        // so a group taller than the list still starts at its app row.
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                proxy.scrollTo(ProcessRowID(pid: last.pid))
+                proxy.scrollTo(app.pid)
+            }
+        }
     }
 
     private func columnHeader(_ title: String, sort column: AppSort, width: CGFloat) -> some View {
@@ -164,6 +200,8 @@ struct MenuAppRow: View {
     let share: Double
     let forceMode: Bool
     let isQuitting: Bool
+    let isExpanded: Bool
+    let onToggle: () -> Void
     let onQuit: () -> Void
 
     @State private var hovering = false
@@ -178,6 +216,10 @@ struct MenuAppRow: View {
                         Text("+\(app.helperCount)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(.secondary)
+                            .rotationEffect(.degrees(isExpanded ? 90 : 0))
                     }
                 }
                 ShareBar(fraction: share, tint: sort == .cpu ? .teal : (share > 0.66 ? .red : .accentColor))
@@ -209,7 +251,82 @@ struct MenuAppRow: View {
         .monospacedDigit()
         .padding(.horizontal, 12)
         .padding(.vertical, 5)
-        .background(hovering ? Color.primary.opacity(0.06) : .clear)
+        .background(hovering ? Color.primary.opacity(0.06) : (isExpanded ? Color.primary.opacity(0.04) : .clear))
+        .contentShape(Rectangle())
+        .onTapGesture { if app.helperCount > 0 { onToggle() } }
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(named: isExpanded ? "Hide Processes" : "Show Processes") {
+            if app.helperCount > 0 { onToggle() }
+        }
+    }
+}
+
+private struct ProcessRowID: Hashable {
+    let pid: pid_t
+}
+
+private struct MenuProcessRow: View {
+    @Environment(AppMonitor.self) private var monitor
+    let process: ProcessEntry
+    let forceMode: Bool
+    let isEnding: Bool
+
+    @State private var hovering = false
+    /// Set briefly when the signal couldn't be sent, so the click doesn't silently do nothing.
+    @State private var failed = false
+
+    var body: some View {
+        HStack(spacing: MenuAppRow.columnSpacing) {
+            Image(systemName: process.isMain ? "app.fill" : "gearshape.2")
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .frame(width: 12)
+            Text(process.name)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .help("PID \(process.pid)")
+            Spacer(minLength: 0)
+            Text(process.cpu.cpuString)
+                .frame(width: MenuAppRow.cpuWidth, alignment: .trailing)
+            Text(process.footprint.memoryString)
+                .frame(width: MenuAppRow.memoryWidth, alignment: .trailing)
+            ZStack {
+                // Main process has no end button: quitting the app is the app row's job.
+                if isEnding {
+                    ProgressView().controlSize(.mini)
+                } else if failed {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.system(size: 12))
+                        .help("Couldn't end this process (not permitted)")
+                } else if hovering && !process.isMain {
+                    Button {
+                        if !monitor.terminateProcess(process.pid, force: forceMode) {
+                            failed = true
+                            Task {
+                                try? await Task.sleep(for: .seconds(2))
+                                failed = false
+                            }
+                        }
+                    } label: {
+                        Image(systemName: forceMode ? "xmark.octagon.fill" : "xmark.circle.fill")
+                            .foregroundStyle(forceMode ? .red : .secondary)
+                            .font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .help(forceMode ? "Force End Process" : "End Process (hold ⌥ to force)")
+                }
+            }
+            .frame(width: MenuAppRow.quitWidth)
+        }
+        .font(.caption)
+        .monospacedDigit()
+        .foregroundStyle(.secondary)
+        .padding(.leading, 40)
+        .padding(.trailing, 12)
+        .padding(.vertical, 3)
+        .background(hovering ? Color.primary.opacity(0.06) : Color.primary.opacity(0.04))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }

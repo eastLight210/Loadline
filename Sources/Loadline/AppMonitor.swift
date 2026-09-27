@@ -39,6 +39,20 @@ extension Array where Element == AppUsage {
     }
 }
 
+extension Array where Element == ProcessEntry {
+    /// Main process stays first; helpers follow the given order.
+    func sorted(by sort: AppSort) -> [ProcessEntry] {
+        sorted { a, b in
+            if a.isMain != b.isMain { return a.isMain }
+            switch sort {
+            case .memory: return a.footprint > b.footprint
+            case .cpu: return a.cpu != b.cpu ? a.cpu > b.cpu : a.footprint > b.footprint
+            case .name: return a.name.localizedStandardCompare(b.name) == .orderedAscending
+            }
+        }
+    }
+}
+
 enum MenuBarDisplay: String, CaseIterable, Identifiable {
     case pressureAndCPU, pressure, memory, cpu, iconOnly
     var id: Self { self }
@@ -77,6 +91,8 @@ final class AppMonitor {
     private(set) var popoverSort: AppSort = .memory
     /// Apps we've asked to quit and that haven't disappeared yet.
     private(set) var quitting: Set<pid_t> = []
+    /// Helper processes we've signalled and that haven't disappeared yet.
+    private(set) var endingProcesses: Set<pid_t> = []
 
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var iconCache: [pid_t: NSImage] = [:]
@@ -186,6 +202,7 @@ final class AppMonitor {
         system = memory
         append(Double(memory.pressurePercent), to: &pressureHistory)
         quitting.formIntersection(apps.map(\.pid))
+        endingProcesses.formIntersection(apps.flatMap { $0.processes.map(\.pid) })
     }
 
     private func append(_ value: Double, to history: inout [Double]) {
@@ -208,9 +225,13 @@ final class AppMonitor {
         refreshSoon()
     }
 
-    func terminateProcess(_ pid: pid_t, force: Bool = false) {
-        kill(pid, force ? SIGKILL : SIGTERM)
+    /// Returns false when the signal couldn't be sent (e.g. the process belongs to another user).
+    @discardableResult
+    func terminateProcess(_ pid: pid_t, force: Bool = false) -> Bool {
+        guard kill(pid, force ? SIGKILL : SIGTERM) == 0 else { return false }
+        endingProcesses.insert(pid)
         refreshSoon()
+        return true
     }
 
     func activate(_ app: AppUsage) {
