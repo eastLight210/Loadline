@@ -9,6 +9,12 @@ struct MenuBarView: View {
     @State private var listHeight: CGFloat = 0
     /// App whose processes are shown inline; only one at a time.
     @State private var expandedApp: pid_t?
+    @State private var search = ""
+    /// Not focused on open: the field takes focus only on click or ⌘F.
+    @FocusState private var searchFocused: Bool
+    /// List height captured when a search starts. The popover window doesn't shrink while open (the
+    /// content just floats in the middle of it), so results keep this height instead of resizing.
+    @State private var searchListHeight: CGFloat?
     private let maxListHeight: CGFloat = 400
 
     @AppStorage(SettingsKey.includeAccessoryApps) private var includeAccessory = false
@@ -21,6 +27,10 @@ struct MenuBarView: View {
                 .padding(12)
 
             Divider()
+
+            searchField
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
 
             HStack(spacing: MenuAppRow.columnSpacing) {
                 Text("Apps")
@@ -39,8 +49,12 @@ struct MenuBarView: View {
                 Text("Loading running apps…")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 80)
+            } else if visibleApps.isEmpty {
+                Text("No Matches")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: searchListHeight ?? 80, maxHeight: searchListHeight ?? 80)
             } else {
-                let apps = monitor.apps.sorted(by: sort)
+                let apps = visibleApps
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
@@ -72,7 +86,7 @@ struct MenuBarView: View {
                         .padding(.bottom, 4)
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                     }
-                    .frame(height: min(max(listHeight, 1), maxListHeight))
+                    .frame(height: searchListHeight ?? displayedListHeight, alignment: .top)
                     .scrollBounceBehavior(.basedOnSize)
                 }
             }
@@ -85,14 +99,79 @@ struct MenuBarView: View {
         }
         .frame(width: 340)
         .onAppear {
+            // A popover window hands focus to its first text field when it becomes key; undo that.
+            DispatchQueue.main.async { searchFocused = false }
             modifiers.start()
             Task { await monitor.refresh() }
         }
         .onDisappear {
             modifiers.stop()
             expandedApp = nil
+            search = ""
+            searchFocused = false
+            searchListHeight = nil
+        }
+        .onChange(of: search) {
+            if search.isEmpty {
+                searchListHeight = nil
+            } else if searchListHeight == nil {
+                searchListHeight = displayedListHeight
+            }
+            expandForSearch()
         }
         .onChange(of: includeAccessory) { Task { await monitor.refresh() } }
+    }
+
+    private var displayedListHeight: CGFloat {
+        min(max(listHeight, 1), maxListHeight)
+    }
+
+    private var visibleApps: [AppUsage] {
+        monitor.apps.matching(search).sorted(by: sort)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search apps or processes", text: $search)
+                .textFieldStyle(.plain)
+                .focused($searchFocused)
+                .onKeyPress(.escape) {
+                    // First Esc clears the query; with nothing to clear it closes the popover as usual.
+                    guard !search.isEmpty else { return .ignored }
+                    search = ""
+                    return .handled
+                }
+            if !search.isEmpty {
+                Button {
+                    search = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear Search")
+            }
+        }
+        .font(.callout)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 6))
+        .background {
+            Button("Search") { searchFocused = true }
+                .keyboardShortcut("f")
+                .hidden()
+        }
+    }
+
+    /// When the top result matched only through one of its processes, show them so the match is visible.
+    private func expandForSearch() {
+        let apps = visibleApps
+        if let expandedApp, apps.contains(where: { $0.pid == expandedApp }) { return }
+        let first = apps.first
+        let processOnly = !search.isEmpty && first.map { !$0.name.localizedCaseInsensitiveContains(search) } == true
+        expandedApp = processOnly ? first?.pid : nil
     }
 
     private func toggle(_ app: AppUsage, proxy: ScrollViewProxy) {
@@ -132,7 +211,13 @@ struct MenuBarView: View {
 
     private var footer: some View {
         HStack {
-            Text("\(monitor.apps.count) apps · \(monitor.totalAppMemory.memoryString)")
+            Group {
+                if search.isEmpty {
+                    Text("\(monitor.apps.count) apps · \(monitor.totalAppMemory.memoryString)")
+                } else {
+                    Text("\(visibleApps.count) of \(monitor.apps.count) apps")
+                }
+            }
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()

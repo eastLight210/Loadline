@@ -8,11 +8,7 @@ struct MainWindowView: View {
     @State private var forceQuitTarget: AppUsage?
 
     private var visibleApps: [AppUsage] {
-        let filtered = search.isEmpty ? monitor.apps : monitor.apps.filter { app in
-            app.name.localizedCaseInsensitiveContains(search)
-                || app.processes.contains { $0.name.localizedCaseInsensitiveContains(search) }
-        }
-        return filtered.sorted(by: sort)
+        monitor.apps.matching(search).sorted(by: sort)
     }
 
     var body: some View {

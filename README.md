@@ -32,6 +32,7 @@ Open the DMG and drag Loadline to Applications. The app is signed with a Develop
 - CPU and memory-pressure history graphs, plus a memory breakdown (App / Wired / Compressed / Swap)
 - Running apps with per-app CPU and memory, sortable by either column
 - Hover a row to quit the app; hold <kbd>⌥</kbd> to force quit
+- Search apps and their processes (click the field or press <kbd>⌘F</kbd>)
 
 **Details window**
 - Search across apps and their processes

@@ -29,7 +29,19 @@ enum AppSort: String, CaseIterable, Identifiable {
     }
 }
 
+extension AppUsage {
+    func matches(_ query: String) -> Bool {
+        name.localizedCaseInsensitiveContains(query)
+            || processes.contains { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+}
+
 extension Array where Element == AppUsage {
+    /// Apps whose name or any process name contains the query; everything when it's empty.
+    func matching(_ query: String) -> [AppUsage] {
+        query.isEmpty ? self : filter { $0.matches(query) }
+    }
+
     func sorted(by sort: AppSort) -> [AppUsage] {
         switch sort {
         case .memory: sorted { $0.total > $1.total }
