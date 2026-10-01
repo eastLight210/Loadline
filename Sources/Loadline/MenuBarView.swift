@@ -241,14 +241,17 @@ struct MenuBarView: View {
 /// every refresh, an open menu would reset (submenus collapse) while the user is choosing.
 private struct SettingsMenu: View {
     @Environment(AppMonitor.self) private var monitor
-    @AppStorage(SettingsKey.menuBarDisplay) private var menuBarDisplay: MenuBarDisplay = .pressureAndCPU
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismiss) private var dismiss
     @AppStorage(SettingsKey.includeAccessoryApps) private var includeAccessory = false
     @AppStorage(SettingsKey.refreshInterval) private var refreshInterval = 3.0
 
     var body: some View {
         Menu {
-            Picker("Menu Bar Shows", selection: $menuBarDisplay) {
-                ForEach(MenuBarDisplay.allCases) { Text($0.title).tag($0) }
+            Button("Menu Bar Appearance…") {
+                openWindow(id: "menu-bar-appearance")
+                NSApp.activate()
+                dismiss()
             }
             Toggle("Include Menu Bar Apps", isOn: $includeAccessory)
             Picker("Refresh Every", selection: $refreshInterval) {

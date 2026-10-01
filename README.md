@@ -23,7 +23,8 @@ Open the DMG and drag Loadline to Applications. The app is signed with a Develop
 <img src="docs/images/menu-bar.png" width="112" alt="Menu bar showing CPU 6% and memory pressure 24%">
 
 - Live system CPU and memory pressure, with tinted icons for pressure level
-- Choose what the menu bar shows: CPU + Pressure, Memory Pressure, Memory Used, CPU Usage, or Icon Only
+- Pinwheel (default): a solid 20-point icon rotates slowly at idle and faster as CPU usage rises. It is green under normal memory pressure, and turns yellow or red at warning or critical pressure. Rotation changes smoothly between samples and respects Reduce Motion.
+- Open **Menu Bar Appearance…** from the gear menu to see a live preview and choose Pinwheel or Numbers. Numbers can show CPU + Memory Pressure, CPU Usage, Memory Pressure, or Memory Used. Changes apply immediately, and the last numeric choice is remembered when switching styles.
 
 **Popover**
 
@@ -94,6 +95,7 @@ Sources/Loadline/
 ├── AppMonitor.swift      # Sampling loop, app state, quit actions, settings keys
 ├── ProcessSampler.swift  # libproc / Mach sampling of processes, CPU, and memory
 ├── MenuBarView.swift     # Popover UI
+├── MenuBarAppearanceView.swift # Menu bar style settings and live preview
 ├── MainWindowView.swift  # Details window
 ├── SharedViews.swift     # System summary, graphs, bars
 └── Updater.swift         # Sparkle auto-updates

@@ -66,16 +66,16 @@ extension Array where Element == ProcessEntry {
 }
 
 enum MenuBarDisplay: String, CaseIterable, Identifiable {
-    case pressureAndCPU, pressure, memory, cpu, iconOnly
+    case pinwheel, pressureAndCPU, pressure, memory, cpu
     var id: Self { self }
 
     var title: String {
         switch self {
+        case .pinwheel: "CPU + Memory Pinwheel"
         case .pressureAndCPU: "CPU + Pressure"
         case .pressure: "Memory Pressure"
         case .memory: "Memory Used"
         case .cpu: "CPU Usage"
-        case .iconOnly: "Icon Only"
         }
     }
 }
@@ -84,6 +84,7 @@ enum SettingsKey {
     static let refreshInterval = "refreshInterval"
     static let includeAccessoryApps = "includeAccessoryApps"
     static let menuBarDisplay = "menuBarDisplay"
+    static let menuBarNumericDisplay = "menuBarNumericDisplay"
     static let popoverSort = "popoverSort"
 }
 
@@ -116,10 +117,14 @@ final class AppMonitor {
     var totalAppMemory: UInt64 { apps.reduce(0) { $0 + $1.total } }
 
     init() {
+        if let display = UserDefaults.standard.string(forKey: SettingsKey.menuBarDisplay),
+           ["waveforms", "iconOnly"].contains(display) {
+            UserDefaults.standard.set(MenuBarDisplay.pinwheel.rawValue, forKey: SettingsKey.menuBarDisplay)
+        }
         UserDefaults.standard.register(defaults: [
             SettingsKey.refreshInterval: 3.0,
             SettingsKey.includeAccessoryApps: false,
-            SettingsKey.menuBarDisplay: MenuBarDisplay.pressureAndCPU.rawValue,
+            SettingsKey.menuBarDisplay: MenuBarDisplay.pinwheel.rawValue,
             SettingsKey.popoverSort: AppSort.memory.rawValue,
         ])
         popoverSort = AppSort(rawValue: UserDefaults.standard.string(forKey: SettingsKey.popoverSort) ?? "") ?? .memory
