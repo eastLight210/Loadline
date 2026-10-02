@@ -1,0 +1,38 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # build.sh needs Xcode 27 (SwiftPM build layout, App Intents tools, .icon assets).
+    # GitHub ships one Xcode per image now; xcode-27 is the only label that has it.
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - uses: actions/cache@v4
+        with:
+          path: .build/artifacts
+          key: spm-artifacts-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+
+      - name: Build app
+        run: ./build.sh debug
+
+      - name: Run tests
+        if: hashFiles('Tests/**/*.swift') != ''
+        run: swift test
