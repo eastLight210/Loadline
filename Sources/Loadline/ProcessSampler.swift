@@ -73,10 +73,11 @@ enum ProcessSampler {
     // Private libsystem SPI that Activity Monitor uses to attribute XPC services
     // (e.g. Safari's WebContent processes, whose parent is launchd) to their app.
     private typealias ResponsibleFn = @convention(c) (pid_t) -> pid_t
-    private static let responsiblePID: ResponsibleFn? = {
+    private static let responsiblePID: ProcessGrouping.ResponsibleLookup? = {
         let rtldDefault = UnsafeMutableRawPointer(bitPattern: -2)
         guard let sym = dlsym(rtldDefault, "responsibility_get_pid_responsible_for_pid") else { return nil }
-        return unsafeBitCast(sym, to: ResponsibleFn.self)
+        let fn = unsafeBitCast(sym, to: ResponsibleFn.self)
+        return { fn($0) }
     }()
 
     private static let host = mach_host_self()
@@ -90,7 +91,7 @@ enum ProcessSampler {
 
     static func sample(apps: [AppSeed], previousCPU: [pid_t: UInt64], elapsed: TimeInterval) -> SampleResult {
         let uid = getuid()
-        let foldedInto = foldTargets(for: apps)
+        let foldedInto = ProcessGrouping.foldTargets(for: apps, responsible: responsiblePID)
         let topLevel = apps.filter { foldedInto[$0.pid] == nil }
         let appPIDs = Set(topLevel.map(\.pid))
         // Folded apps keep their friendly name (e.g. "Virtual Machine Service for Claude").
@@ -104,14 +105,9 @@ enum ProcessSampler {
             shortNames[pid] = info.name
         }
 
-        var groups: [pid_t: [pid_t]] = [:]
-        for pid in parent.keys {
-            if appPIDs.contains(pid) {
-                groups[pid, default: []].append(pid)
-            } else if let owner = owner(of: pid, appPIDs: appPIDs, foldedInto: foldedInto, parent: parent) {
-                groups[owner, default: []].append(pid)
-            }
-        }
+        let groups = ProcessGrouping.groups(
+            appPIDs: appPIDs, foldedInto: foldedInto, parent: parent, responsible: responsiblePID
+        )
 
         var cpuTimes: [pid_t: UInt64] = [:]
         var samples: [AppSample] = []
@@ -195,52 +191,6 @@ enum ProcessSampler {
     }
 
     // MARK: - libproc helpers
-
-    /// Non-regular apps whose responsible process is another listed app — e.g. Claude's
-    /// Virtualization XPC service, which registers as its own accessory app — map to that app.
-    private static func foldTargets(for apps: [AppSeed]) -> [pid_t: pid_t] {
-        guard let responsiblePID else { return [:] }
-        let seeds = Dictionary(apps.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
-        var direct: [pid_t: pid_t] = [:]
-        for seed in apps where !seed.isRegular {
-            let responsible = responsiblePID(seed.pid)
-            if responsible != seed.pid, seeds[responsible] != nil { direct[seed.pid] = responsible }
-        }
-        // Follow chains (A folded into B folded into C) to the top-level app.
-        var resolved: [pid_t: pid_t] = [:]
-        for pid in direct.keys {
-            var target = direct[pid]!
-            var hops = 0
-            while let next = direct[target], hops < 8 {
-                target = next
-                hops += 1
-            }
-            if direct[target] == nil { resolved[pid] = target }
-        }
-        return resolved
-    }
-
-    private static func owner(
-        of pid: pid_t, appPIDs: Set<pid_t>, foldedInto: [pid_t: pid_t], parent: [pid_t: pid_t]
-    ) -> pid_t? {
-        if let target = foldedInto[pid] { return target }
-        if let responsiblePID {
-            let responsible = responsiblePID(pid)
-            if responsible != pid {
-                if appPIDs.contains(responsible) { return responsible }
-                if let target = foldedInto[responsible] { return target }
-            }
-        }
-        var current = parent[pid] ?? 0
-        var depth = 0
-        while current > 1, depth < 64 {
-            if appPIDs.contains(current) { return current }
-            if let target = foldedInto[current] { return target }
-            current = parent[current] ?? 0
-            depth += 1
-        }
-        return nil
-    }
 
     private static func allPIDs() -> [pid_t] {
         let estimate = proc_listallpids(nil, 0)
