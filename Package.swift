@@ -15,6 +15,12 @@ let package = Package(
             swiftSettings: [.swiftLanguageMode(.v5)],
             // build.sh embeds Sparkle.framework in Contents/Frameworks.
             linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
+        ),
+        .testTarget(
+            name: "LoadlineTests",
+            dependencies: ["Loadline"],
+            path: "Tests/LoadlineTests",
+            swiftSettings: [.swiftLanguageMode(.v5)]
         )
     ]
 )
