@@ -87,13 +87,13 @@ private struct PinwheelMenuBarLabel: View {
             .accessibilityValue(monitor.cpuHistory.isEmpty
                 ? "Collecting samples"
                 : "CPU \(Int(monitor.systemCPU)) percent, memory pressure \(monitor.system.pressurePercent) percent, \(monitor.system.pressure.label)")
-            .task(id: reduceMotion) {
-                guard !reduceMotion else { return }
+            .task(id: reduceMotion || monitor.displaysAsleep) {
+                guard !reduceMotion, !monitor.displaysAsleep else { return }
                 let clock = ContinuousClock()
                 var previous = clock.now
                 var motion = PinwheelMotion(angle: angle)
                 while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(1.0 / 30)) }
+                    do { try await Task.sleep(for: .seconds(motion.frameInterval)) }
                     catch { return }
                     guard !Task.isCancelled else { return }
                     let now = clock.now
@@ -114,6 +114,13 @@ private struct PinwheelMotion {
     private var revolutionsPerSecond = 0.08
 
     init(angle: Double = 0) { self.angle = angle }
+
+    /// Redraw only as often as the rotation needs: about 5° per frame, between 4 and 30 frames
+    /// a second. An idle Mac (the common case) gets ~6 frames a second instead of 30.
+    var frameInterval: Double {
+        let degreesPerSecond = 360 * revolutionsPerSecond
+        return min(0.25, max(1.0 / 30, 5 / degreesPerSecond))
+    }
 
     mutating func advance(cpu: Double, elapsed: Double) {
         let load = cpu.isFinite ? min(100, max(0, cpu)) : 0

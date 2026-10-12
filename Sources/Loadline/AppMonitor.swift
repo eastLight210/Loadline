@@ -106,12 +106,20 @@ final class AppMonitor {
     private(set) var quitting: Set<pid_t> = []
     /// Helper processes we've signalled and that haven't disappeared yet.
     private(set) var endingProcesses: Set<pid_t> = []
+    /// True while every display is asleep; sampling and the pinwheel animation pause.
+    private(set) var displaysAsleep = false
+    /// How often the per-app process scan runs while no app list is on screen. System-wide
+    /// CPU and memory (what the menu bar shows) still update at the refresh interval.
+    static let backgroundProcessInterval: TimeInterval = 15
 
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var iconCache: [pid_t: NSImage] = [:]
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var cpuTimes: [pid_t: UInt64] = [:]
     @ObservationIgnored private var lastSample: Date?
+    @ObservationIgnored private var processSampleCount = 0
+    /// Open popovers/windows that list apps; while any is visible the process scan runs at full rate.
+    @ObservationIgnored private var appListViewers = 0
     @ObservationIgnored private var lastTicks: CPUTicks?
 
     var totalAppMemory: UInt64 { apps.reduce(0) { $0 + $1.total } }
@@ -128,7 +136,37 @@ final class AppMonitor {
             SettingsKey.popoverSort: AppSort.memory.rawValue,
         ])
         popoverSort = AppSort(rawValue: UserDefaults.standard.string(forKey: SettingsKey.popoverSort) ?? "") ?? .memory
+        observeDisplaySleep()
         start()
+    }
+
+    private func observeDisplaySleep() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.displaysAsleep = true }
+        }
+        center.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.displaysAsleep = false
+                Task { await self?.refresh() }
+            }
+        }
+    }
+
+    /// Call when a view listing apps appears; pair with `appListDidDisappear()`.
+    func appListDidAppear() {
+        appListViewers += 1
+        guard appListViewers == 1 else { return }
+        Task {
+            await refresh()
+            // The background scan may be up to 15 s old, so take a fresh CPU baseline quickly.
+            try? await Task.sleep(for: .seconds(1))
+            await refresh()
+        }
+    }
+
+    func appListDidDisappear() {
+        appListViewers = max(0, appListViewers - 1)
     }
 
     func setPopoverSort(_ sort: AppSort) {
@@ -140,19 +178,40 @@ final class AppMonitor {
         guard loop == nil else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
-                let isFirst = self?.lastSample == nil
-                await self?.refresh()
-                // CPU needs two samples, so take the second one quickly.
-                let interval = isFirst ? 1 : max(1, UserDefaults.standard.double(forKey: SettingsKey.refreshInterval))
-                try? await Task.sleep(for: .seconds(interval))
+                guard let interval = await self?.tick() else { return }
+                // Tolerance lets macOS coalesce this wakeup with others.
+                try? await Task.sleep(for: .seconds(interval), tolerance: .seconds(interval / 10))
             }
         }
     }
 
-    func refresh() async {
+    /// One pass of the sampling loop; returns how long to wait before the next one.
+    private func tick() async -> TimeInterval {
+        let interval = max(1, UserDefaults.standard.double(forKey: SettingsKey.refreshInterval))
+        guard !displaysAsleep else { return interval }
+        let processAge = lastSample.map { Date().timeIntervalSince($0) } ?? .infinity
+        // Per-app CPU needs two scans, so the first two always run.
+        let wantsProcesses = appListViewers > 0 || processSampleCount < 2
+            || processAge >= Self.backgroundProcessInterval - interval / 2
+        await refresh(includingProcesses: wantsProcesses)
+        // CPU needs two samples, so take the second one quickly.
+        return cpuHistory.isEmpty || processSampleCount < 2 ? 1 : interval
+    }
+
+    /// Samples system-wide CPU and memory, plus every app's processes unless `includingProcesses`
+    /// is false (the menu bar alone needs only the system-wide numbers).
+    func refresh(includingProcesses: Bool = true) async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
+
+        guard includingProcesses else {
+            let (memory, ticks) = await Task.detached(priority: .utility) {
+                (ProcessSampler.systemMemory(), ProcessSampler.cpuTicks())
+            }.value
+            apply(memory: memory, ticks: ticks)
+            return
+        }
 
         let includeAccessory = UserDefaults.standard.bool(forKey: SettingsKey.includeAccessoryApps)
         let me = getpid()
@@ -185,13 +244,7 @@ final class AppMonitor {
         }.value
         cpuTimes = result.cpuTimes
         lastSample = now
-        if let ticks {
-            if let lastTicks {
-                systemCPU = ticks.usage(since: lastTicks)
-                append(systemCPU, to: &cpuHistory)
-            }
-            lastTicks = ticks
-        }
+        processSampleCount += 1
 
         var icons: [pid_t: NSImage] = [:]
         var urls: [pid_t: URL] = [:]
@@ -216,10 +269,21 @@ final class AppMonitor {
                 )
             }
             .sorted { $0.total > $1.total }
-        system = memory
-        append(Double(memory.pressurePercent), to: &pressureHistory)
+        apply(memory: memory, ticks: ticks)
         quitting.formIntersection(apps.map(\.pid))
         endingProcesses.formIntersection(apps.flatMap { $0.processes.map(\.pid) })
+    }
+
+    private func apply(memory: SystemMemory, ticks: CPUTicks?) {
+        if let ticks {
+            if let lastTicks {
+                systemCPU = ticks.usage(since: lastTicks)
+                append(systemCPU, to: &cpuHistory)
+            }
+            lastTicks = ticks
+        }
+        system = memory
+        append(Double(memory.pressurePercent), to: &pressureHistory)
     }
 
     private func append(_ value: Double, to history: inout [Double]) {
