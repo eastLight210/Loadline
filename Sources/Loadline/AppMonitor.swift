@@ -169,6 +169,14 @@ final class AppMonitor {
         appListViewers = max(0, appListViewers - 1)
     }
 
+    /// A minimized or hidden (⌘H) window keeps its views alive, so also require that one of our
+    /// windows other than the status item is actually on screen.
+    private var appListOnScreen: Bool {
+        appListViewers > 0 && NSApp.windows.contains {
+            $0.occlusionState.contains(.visible) && !$0.className.contains("StatusBar")
+        }
+    }
+
     func setPopoverSort(_ sort: AppSort) {
         popoverSort = sort
         UserDefaults.standard.set(sort.rawValue, forKey: SettingsKey.popoverSort)
@@ -191,7 +199,7 @@ final class AppMonitor {
         guard !displaysAsleep else { return interval }
         let processAge = lastSample.map { Date().timeIntervalSince($0) } ?? .infinity
         // Per-app CPU needs two scans, so the first two always run.
-        let wantsProcesses = appListViewers > 0 || processSampleCount < 2
+        let wantsProcesses = appListOnScreen || processSampleCount < 2
             || processAge >= Self.backgroundProcessInterval - interval / 2
         await refresh(includingProcesses: wantsProcesses)
         // CPU needs two samples, so take the second one quickly.
