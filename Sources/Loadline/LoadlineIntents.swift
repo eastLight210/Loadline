@@ -44,13 +44,13 @@ struct RunningAppQuery: EntityStringQuery {
 
     @MainActor
     func entities(for identifiers: [String]) async throws -> [RunningAppEntity] {
-        await monitor.waitForSample()
+        await monitor.refreshAppsIfStale()
         return monitor.apps.filter { identifiers.contains($0.entityID) }.map(RunningAppEntity.init)
     }
 
     @MainActor
     func entities(matching string: String) async throws -> [RunningAppEntity] {
-        await monitor.waitForSample()
+        await monitor.refreshAppsIfStale()
         return monitor.apps
             .filter { $0.name.localizedCaseInsensitiveContains(string) }
             .map(RunningAppEntity.init)
@@ -58,7 +58,7 @@ struct RunningAppQuery: EntityStringQuery {
 
     @MainActor
     func suggestedEntities() async throws -> [RunningAppEntity] {
-        await monitor.waitForSample()
+        await monitor.refreshAppsIfStale()
         return monitor.apps.sorted(by: .memory).prefix(10).map(RunningAppEntity.init)
     }
 }
@@ -92,7 +92,7 @@ struct GetTopAppsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<[RunningAppEntity]> & ProvidesDialog {
-        await monitor.waitForSample()
+        await monitor.refreshAppsIfStale()
         let top = Array(monitor.apps.sorted(by: metric.sort).prefix(count))
         guard let first = top.first else {
             return .result(value: [], dialog: "No apps are running.")
@@ -144,7 +144,7 @@ struct QuitRunningAppIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        await monitor.waitForSample()
+        await monitor.refreshAppsIfStale()
         guard let target = monitor.apps.first(where: { $0.entityID == app.id }) else {
             return .result(dialog: "\(app.name) isn't running.")
         }

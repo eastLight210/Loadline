@@ -108,16 +108,12 @@ final class AppMonitor {
     private(set) var endingProcesses: Set<pid_t> = []
     /// True while every display is asleep; sampling and the pinwheel animation pause.
     private(set) var displaysAsleep = false
-    /// How often the per-app process scan runs while no app list is on screen. System-wide
-    /// CPU and memory (what the menu bar shows) still update at the refresh interval.
-    static let backgroundProcessInterval: TimeInterval = 15
 
     @ObservationIgnored private var loop: Task<Void, Never>?
     @ObservationIgnored private var iconCache: [pid_t: NSImage] = [:]
     @ObservationIgnored private var isRefreshing = false
     @ObservationIgnored private var cpuTimes: [pid_t: UInt64] = [:]
     @ObservationIgnored private var lastSample: Date?
-    @ObservationIgnored private var processSampleCount = 0
     /// Open popovers/windows that list apps; while any is visible the process scan runs at full rate.
     @ObservationIgnored private var appListViewers = 0
     @ObservationIgnored private var lastTicks: CPUTicks?
@@ -158,10 +154,10 @@ final class AppMonitor {
         appListViewers += 1
         guard appListViewers == 1 else { return }
         Task {
-            await refresh()
-            // The background scan may be up to 15 s old, so take a fresh CPU baseline quickly.
+            await refreshAfterInFlight()
+            // The last scan may be long gone, so take a fresh CPU baseline quickly.
             try? await Task.sleep(for: .seconds(1))
-            await refresh()
+            await refreshAfterInFlight()
         }
     }
 
@@ -197,13 +193,30 @@ final class AppMonitor {
     private func tick() async -> TimeInterval {
         let interval = max(1, UserDefaults.standard.double(forKey: SettingsKey.refreshInterval))
         guard !displaysAsleep else { return interval }
-        let processAge = lastSample.map { Date().timeIntervalSince($0) } ?? .infinity
-        // Per-app CPU needs two scans, so the first two always run.
-        let wantsProcesses = appListOnScreen || processSampleCount < 2
-            || processAge >= Self.backgroundProcessInterval - interval / 2
-        await refresh(includingProcesses: wantsProcesses)
+        // Per-app processes are scanned only while an app list is on screen; the menu bar
+        // needs just the system-wide numbers.
+        await refresh(includingProcesses: appListOnScreen)
         // CPU needs two samples, so take the second one quickly.
-        return cpuHistory.isEmpty || processSampleCount < 2 ? 1 : interval
+        return cpuHistory.isEmpty ? 1 : interval
+    }
+
+    /// For Shortcuts and Siri, which read per-app data while no app list may be open. Scans now
+    /// if the last scan is old, and again a second later when it's too old for per-app CPU.
+    func refreshAppsIfStale() async {
+        let interval = max(1, UserDefaults.standard.double(forKey: SettingsKey.refreshInterval))
+        let age = lastSample.map { Date().timeIntervalSince($0) } ?? .infinity
+        guard age > interval * 1.5 else { return }
+        await refreshAfterInFlight()
+        guard age > interval * 3 else { return }
+        try? await Task.sleep(for: .seconds(1))
+        await refreshAfterInFlight()
+    }
+
+    /// `refresh()` returns at once while another refresh runs (e.g. the loop's system-only
+    /// one), which would leave the app list unscanned; wait that one out first.
+    private func refreshAfterInFlight() async {
+        while isRefreshing { try? await Task.sleep(for: .milliseconds(20)) }
+        await refresh()
     }
 
     /// Samples system-wide CPU and memory, plus every app's processes unless `includingProcesses`
@@ -252,7 +265,6 @@ final class AppMonitor {
         }.value
         cpuTimes = result.cpuTimes
         lastSample = now
-        processSampleCount += 1
 
         var icons: [pid_t: NSImage] = [:]
         var urls: [pid_t: URL] = [:]
