@@ -102,10 +102,11 @@ struct MenuBarView: View {
             // A popover window hands focus to its first text field when it becomes key; undo that.
             DispatchQueue.main.async { searchFocused = false }
             modifiers.start()
-            Task { await monitor.refresh() }
+            monitor.appListDidAppear()
         }
         .onDisappear {
             modifiers.stop()
+            monitor.appListDidDisappear()
             expandedApp = nil
             search = ""
             searchFocused = false

@@ -55,6 +55,8 @@ struct MainWindowView: View {
             .padding(.vertical, 6)
         }
         .searchable(text: $search, prompt: "Search apps or processes")
+        .onAppear { monitor.appListDidAppear() }
+        .onDisappear { monitor.appListDidDisappear() }
         .toolbar {
             ToolbarItem {
                 Picker("Sort", selection: $sort) {
